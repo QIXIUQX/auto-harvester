@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "particle": "auto-harvester:block/auto_harvester_side",
+    "top": "auto-harvester:block/auto_harvester_top",
+    "bottom": "auto-harvester:block/auto_harvester_side",
+    "side": "auto-harvester:block/auto_harvester_side"
+  }
+}

@@ -1,0 +1,41 @@
+{
+	"schemaVersion": 1,
+	"id": "auto-harvester",
+	"version": "${version}",
+	"name": "auto-harvester",
+	"description": "This is an example description! Tell everyone what your mod is about!",
+	"authors": [
+		"shiguang"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/QIXIUQX/auto-harvester"
+	},
+	"license": "MIT",
+	"icon": "assets/auto-harvester/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.shiguang.AutoHarvester"
+		],
+		"client": [
+			"com.shiguang.client.AutoHarvesterClient"
+		],
+		"fabric-datagen": [
+			"com.shiguang.client.AutoHarvesterDataGenerator"
+		]
+	},
+	"mixins": [
+		"auto-harvester.mixins.json",
+		{
+			"config": "auto-harvester.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

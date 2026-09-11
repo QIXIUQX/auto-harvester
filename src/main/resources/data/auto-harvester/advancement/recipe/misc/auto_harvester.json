@@ -1,0 +1,24 @@
+{
+  "criteria": {
+    "get_the_recipe": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "minecraft:cobblestone"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "get_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "auto-harvester:auto_harvester"
+    ]
+  }
+}

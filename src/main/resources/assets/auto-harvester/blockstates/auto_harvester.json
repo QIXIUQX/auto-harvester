@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "auto-harvester:block/auto_harvester" },
+    "facing=south": { "model": "auto-harvester:block/auto_harvester", "y": 180 },
+    "facing=west": { "model": "auto-harvester:block/auto_harvester", "y": 270 },
+    "facing=east": { "model": "auto-harvester:block/auto_harvester", "y": 90 }
+  }
+}
