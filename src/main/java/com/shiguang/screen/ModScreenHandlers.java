@@ -5,6 +5,8 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Util;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.Items;
 
@@ -55,12 +57,17 @@ public class ModScreenHandlers {
 	 * <p>
 	 * 直接复用原版方块名（{@code block.minecraft.wheat} 等），
 	 * 因此会随游戏语言自动切换，无需在模组语言文件里重复维护 10 种作物的名称。
+	 * <p>
+	 * 注意必须用 {@link Util#makeDescriptionId} 拼键：它会做
+	 * {@code namespace:path → namespace.path} 的转换（把冒号换成点、斜杠换成点），
+	 * 直接字符串拼接会得到 {@code block.minecraft:wheat} 这种无效键，
+	 * 界面上就会原样显示这串键名。
 	 *
 	 * @param index 作物索引（对应 {@link #CROP_IDS}）
 	 * @return 翻译键，例如 {@code block.minecraft.wheat}
 	 */
 	public static String cropNameKey(int index) {
-		return "block." + CROP_IDS[index];
+		return Util.makeDescriptionId("block", Identifier.parse(CROP_IDS[index]));
 	}
 
 	/** 作物对应的物品（用于 GUI 图标显示） */
