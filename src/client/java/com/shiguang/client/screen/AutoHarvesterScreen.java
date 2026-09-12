@@ -3,7 +3,9 @@ package com.shiguang.client.screen;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 
 import com.shiguang.screen.AutoHarvesterScreenHandler;
@@ -51,10 +53,43 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 	private static final int PANEL_MARGIN = 8;
 	private static final int HEADER_GAP = 12;
 
-	/** 滚动条宽度、与列表右侧的间距、滑块最小高度 */
-	private static final int SCROLLBAR_WIDTH = 4;
-	private static final int SCROLLBAR_GAP = 3;
+	/** 滚动条宽度、与列表右侧的间距、滑块最小高度（宽度取原版精灵的 6px） */
+	private static final int SCROLLBAR_WIDTH = 6;
+	private static final int SCROLLBAR_GAP = 2;
 	private static final int SCROLLBAR_MIN_THUMB = 16;
+
+	// ===== 原版外观素材 =====
+
+	/** 面板配色：完全取自原版容器面板（hopper.png / inventory.png）的像素值 */
+	private static final int PANEL_OUTLINE = 0xFF000000;
+	private static final int PANEL_HIGHLIGHT = 0xFFFFFFFF;
+	private static final int PANEL_SHADOW = 0xFF555555;
+	private static final int PANEL_BODY = 0xFFC6C6C6;
+	/** 原版单格贴图（GUI 图集精灵，对应 gui/sprites/container/slot.png） */
+	private static final Identifier SLOT_SPRITE = Identifier.withDefaultNamespace("container/slot");
+	/** 原版滚动条精灵（gui/sprites/widget/scroller*.png，均为带九宫格元数据的 6px 宽精灵） */
+	private static final Identifier SCROLLBAR_BACKGROUND_SPRITE = Identifier.withDefaultNamespace("widget/scroller_background");
+	/**
+	 * 滚动条滑块配色。
+	 * <p>
+	 * 原版 {@code widget/scroller} 滑块本身是浅灰（#C0C0C0，为深色列表背景设计），
+	 * 放在本界面的浅灰面板上会看不出来，因此滑块改为「亮灰填充 + 1px 深色描边」，
+	 * 这样压在黑色轨道或浅色面板上都能看清。
+	 */
+	private static final int SCROLLBAR_THUMB_BODY = 0xFFC6C6C6;
+	private static final int SCROLLBAR_THUMB_BORDER = 0xFF373737;
+	/** 文本颜色：原版容器界面用深灰字压在浅灰面板上 */
+	private static final int TEXT_COLOR = 0xFF404040;
+	private static final int TEXT_COLOR_DIM = 0xFF555555;
+	/** 作物名颜色（原版深绿 / 深红，在浅灰面板上可读） */
+	private static final int NAME_COLOR_ON = 0xFF00AA00;
+	private static final int NAME_COLOR_OFF = 0xFFAA0000;
+
+	/** 作物行的格子（原版单格贴图，18x18）与行内边距 */
+	private static final int SLOT_SIZE = 18;
+	private static final int ROW_SLOT_X = 2;
+	private static final int ROW_SLOT_Y = 3;
+	private static final int ROW_TEXT_X = ROW_SLOT_X + SLOT_SIZE + 6;
 
 	/** 列表布局坐标 */
 	private int listX, listY, listWidth;
@@ -139,7 +174,7 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 						rebuildButtons();
 						ClientPlayNetworking.send(new CropTogglePayload(idx, newState));
 					}
-			).bounds(listX + listWidth - 40, rowY, 36, 18).build();
+			).bounds(listX + listWidth - 40, rowY + ROW_SLOT_Y, 36, 18).build();
 
 			this.addRenderableWidget(btn);
 		}
@@ -204,17 +239,13 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 		int panelRight = this.width / 2 + panelHalfWidth;
 		int panelBottom = this.height / 2 + PANEL_HALF_HEIGHT;
 
-		// 绘制背景面板
-		guiGraphics.fill(panelLeft, panelTop, panelRight, panelBottom, 0xCC1A1A2E);
-		// 顶部蓝色装饰条
-		guiGraphics.fill(panelLeft, panelTop, panelRight, panelTop + 2, 0xFF4488FF);
-		// 底部蓝色装饰条
-		guiGraphics.fill(panelLeft, panelBottom - 2, panelRight, panelBottom, 0xFF4488FF);
+		// 原版容器面板（九宫格拉伸，支持任意尺寸）
+		drawPanel(guiGraphics, panelLeft, panelTop, panelRight - panelLeft, panelBottom - panelTop);
 
 		// 标题文字（左对齐，右上角留给两个附加开关按钮）
-		guiGraphics.text(this.font, this.title, panelLeft + 8, panelTop + 10, 0xFFFFFF, true);
+		guiGraphics.text(this.font, this.title, panelLeft + 8, panelTop + 10, TEXT_COLOR, false);
 
-		// 绘制作物列表
+		// 绘制作物列表：每行一个原版格子（放图标）+ 名称 + 开/关按钮
 		int visibleCount = Math.min(ModScreenHandlers.CROP_IDS.length, MAX_VISIBLE);
 		for (int i = 0; i < visibleCount; i++) {
 			int cropIndex = i + scrollOffset;
@@ -222,39 +253,68 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 
 			int rowY = listY + i * ROW_HEIGHT;
 			boolean enabled = handler.isCropEnabled(cropIndex);
-			int textColor = enabled ? 0xFF55FF55 : 0xFFFF5555;
+			int nameColor = enabled ? NAME_COLOR_ON : NAME_COLOR_OFF;
 			// 作物名复用原版方块翻译键，随游戏语言切换
 			Component name = Component.translatable(ModScreenHandlers.cropNameKey(cropIndex));
 
-			// 行背景（半透明白色）
-			guiGraphics.fill(listX, rowY, listX + listWidth, rowY + ROW_HEIGHT - 2, 0x40FFFFFF);
+			// 原版格子
+			int slotX = listX + ROW_SLOT_X;
+			int slotY = rowY + ROW_SLOT_Y;
+			guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, SLOT_SPRITE, slotX, slotY, SLOT_SIZE, SLOT_SIZE);
+
+			// 格子内的物品图标（原版在格子内偏移 1px）
+			var itemStack = new net.minecraft.world.item.ItemStack(ModScreenHandlers.CROP_ITEMS[cropIndex]);
+			guiGraphics.item(itemStack, slotX + 1, slotY + 1);
 
 			// 作物名称
-			guiGraphics.text(this.font, name, listX + 8, rowY + 5, textColor, true);
-
-			// 物品图标
-			var itemStack = new net.minecraft.world.item.ItemStack(ModScreenHandlers.CROP_ITEMS[cropIndex]);
-			guiGraphics.item(itemStack, listX + listWidth - 60, rowY + 1);
+			guiGraphics.text(this.font, name, listX + ROW_TEXT_X, rowY + 8, nameColor, false);
 		}
 
-		// 滚动条（内容超过一屏时才显示）
+		// 滚动条（内容超过一屏时才显示）：黑色轨道用原版精灵，滑块为亮灰手柄
 		if (scrollbarVisible) {
 			int thumbHeight = thumbHeight();
 			int thumbY = thumbY(thumbHeight);
-			// 轨道
-			guiGraphics.fill(scrollbarX, scrollbarY, scrollbarX + SCROLLBAR_WIDTH, scrollbarY + scrollbarHeight, 0x40FFFFFF);
-			// 滑块（与面板装饰条同色）
-			guiGraphics.fill(scrollbarX, thumbY, scrollbarX + SCROLLBAR_WIDTH, thumbY + thumbHeight, 0xFF4488FF);
+			guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, SCROLLBAR_BACKGROUND_SPRITE,
+					scrollbarX, scrollbarY, SCROLLBAR_WIDTH, scrollbarHeight);
+			guiGraphics.fill(scrollbarX, thumbY, scrollbarX + SCROLLBAR_WIDTH, thumbY + thumbHeight, SCROLLBAR_THUMB_BORDER);
+			guiGraphics.fill(scrollbarX + 1, thumbY + 1,
+					scrollbarX + SCROLLBAR_WIDTH - 1, thumbY + thumbHeight - 1, SCROLLBAR_THUMB_BODY);
 		}
 
 		// 滚动提示
 		if (ModScreenHandlers.CROP_IDS.length > MAX_VISIBLE) {
 			guiGraphics.centeredText(this.font,
 					Component.translatable("gui.auto-harvester.scroll_hint"),
-					this.width / 2, listY + MAX_VISIBLE * ROW_HEIGHT + 4, 0x888888);
+					this.width / 2, listY + MAX_VISIBLE * ROW_HEIGHT + 4, TEXT_COLOR_DIM);
 		}
 
 		super.extractRenderState(guiGraphics, mouseX, mouseY, deltaTicks);
+	}
+
+	/**
+	 * 按原版容器面板的像素结构绘制面板（尺寸任意）。
+	 * <p>
+	 * 结构取自原版 hopper.png / inventory.png 的实际像素：
+	 * 1px 黑色描边 + 内侧 2px 白色高光（上/左）与 2px 深灰阴影（下/右）+ {@code #C6C6C6} 底色。
+	 * 原版四角有 1px 圆角缺口，这里用直角（1 像素差异，实际不可见）。
+	 */
+	private static void drawPanel(GuiGraphicsExtractor guiGraphics, int x, int y, int width, int height) {
+		int right = x + width;
+		int bottom = y + height;
+
+		// 底色
+		guiGraphics.fill(x + 3, y + 3, right - 3, bottom - 3, PANEL_BODY);
+		// 上/左 2px 高光
+		guiGraphics.fill(x + 1, y + 1, right - 1, y + 3, PANEL_HIGHLIGHT);
+		guiGraphics.fill(x + 1, y + 1, x + 3, bottom - 1, PANEL_HIGHLIGHT);
+		// 下/右 2px 阴影
+		guiGraphics.fill(x + 3, bottom - 3, right - 1, bottom - 1, PANEL_SHADOW);
+		guiGraphics.fill(right - 3, y + 3, right - 1, bottom - 1, PANEL_SHADOW);
+		// 1px 黑描边
+		guiGraphics.fill(x, y, right, y + 1, PANEL_OUTLINE);
+		guiGraphics.fill(x, bottom - 1, right, bottom, PANEL_OUTLINE);
+		guiGraphics.fill(x, y, x + 1, bottom, PANEL_OUTLINE);
+		guiGraphics.fill(right - 1, y, right, bottom, PANEL_OUTLINE);
 	}
 
 	/** 鼠标滚轮事件：上下滚动列表 */
