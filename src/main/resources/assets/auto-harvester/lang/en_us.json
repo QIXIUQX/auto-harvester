@@ -1,3 +1,4 @@
 {
-  "block.auto-harvester.auto_harvester": "Auto Harvester"
+  "block.auto-harvester.auto_harvester": "Auto Harvester",
+  "itemGroup.auto-harvester.main": "Auto Harvester"
 }

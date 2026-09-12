@@ -13,13 +13,14 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import com.shiguang.AutoHarvester;
 import com.shiguang.block.custom.AutoHarvesterBlock;
 
-import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
-
 import java.util.function.Function;
 
 /**
  * 方块注册类。
- * 负责注册自动收割机方块及其对应物品，并将其加入创造模式标签页。
+ * 负责注册自动收割机方块及其对应物品。
+ * <p>
+ * 物品的创造模式分类由 {@link com.shiguang.creativetab.ModCreativeTabs} 统一管理，
+ * 本类不再把方块塞进原版分类。
  */
 public class ModBlocks {
 
@@ -50,14 +51,4 @@ public class ModBlocks {
 					.strength(4.0F, 6.0F)
 					.requiresCorrectToolForDrops()
 	);
-
-	/**
-	 * 初始化方块注册。
-	 * 将自动收割机加入所有创造模式标签页。
-	 */
-	public static void initialize() {
-		CreativeModeTabEvents.MODIFY_OUTPUT_ALL.register((tab, output) -> {
-			output.accept(AUTO_HARVESTER);
-		});
-	}
 }

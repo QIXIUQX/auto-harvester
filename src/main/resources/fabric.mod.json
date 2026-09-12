@@ -2,8 +2,8 @@
 	"schemaVersion": 1,
 	"id": "auto-harvester",
 	"version": "${version}",
-	"name": "auto-harvester",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"name": "Auto Harvester（自动收割机）",
+	"description": "添加自动收割机方块：每 20 tick 扫描朝向一侧 9×9 区域，自动收割成熟作物并补种，产物依次存入背面/左侧/右侧的容器。",
 	"authors": [
 		"shiguang"
 	],

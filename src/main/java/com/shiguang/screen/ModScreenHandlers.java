@@ -18,6 +18,7 @@ import net.fabricmc.fabric.api.menu.v1.ExtendedMenuType;
  * 职责：
  * - 注册 AutoHarvester 的 MenuType（使用 Fabric ExtendedMenuType 传递 BlockPos）
  * - 定义支持的 10 种作物 ID、显示名称和对应物品图标
+ * - 定义 2 个附加开关（满箱停收、静音）的索引、名称和默认值
  * - 提供作物 ID → 索引的查询方法
  */
 public class ModScreenHandlers {
@@ -73,6 +74,27 @@ public class ModScreenHandlers {
 	public static void initialize() {
 		Registry.register(BuiltInRegistries.MENU, AutoHarvester.id("auto_harvester"), AUTO_HARVESTER);
 	}
+
+	// ===== 附加开关（GUI 右上角） =====
+
+	/** 附加开关索引：所有能检测到的容器都装不下时暂停收割 */
+	public static final int SETTING_STOP_WHEN_FULL = 0;
+
+	/** 附加开关索引：静音（关闭收获提示音） */
+	public static final int SETTING_MUTE_SOUND = 1;
+
+	/** 附加开关数量 */
+	public static final int SETTING_COUNT = 2;
+
+	/** 附加开关显示名称（中文，GUI 按钮用） */
+	public static final String[] SETTING_NAMES = {
+			"满箱停收", "静音"
+	};
+
+	/** 附加开关默认值：满箱停收默认开启，静音默认关闭（即默认有提示音） */
+	public static final boolean[] SETTING_DEFAULTS = {
+			true, false
+	};
 
 	/**
 	 * 根据方块 ID 获取作物索引。

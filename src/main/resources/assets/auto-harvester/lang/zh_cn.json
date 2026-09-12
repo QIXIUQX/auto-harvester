@@ -1,3 +1,4 @@
 {
-  "block.auto-harvester.auto_harvester": "自动收割机"
+  "block.auto-harvester.auto_harvester": "自动收割机",
+  "itemGroup.auto-harvester.main": "自动收割机"
 }

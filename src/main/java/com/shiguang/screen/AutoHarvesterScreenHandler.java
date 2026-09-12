@@ -11,7 +11,8 @@ import net.minecraft.world.item.ItemStack;
  * 自动收割机菜单处理器。
  * <p>
  * 职责：
- * - 管理 7 个作物开关的 DataSlot（客户端/服务端自动同步）
+ * - 管理每个作物开关的 DataSlot（客户端/服务端自动同步，数量随 ModScreenHandlers.CROP_IDS 变化）
+ * - 管理附加开关（满箱停收、静音）的 DataSlot，排在作物开关之后
  * - 持有方块位置（blockPos）用于定位对应的 BlockEntity
  * - 提供 onDataChanged 回调，GUI 切换时触发界面刷新
  */
@@ -19,6 +20,9 @@ public class AutoHarvesterScreenHandler extends AbstractContainerMenu {
 
 	/** 各作物是否启用 */
 	private final boolean[] cropEnabled = new boolean[ModScreenHandlers.CROP_IDS.length];
+
+	/** 附加开关状态（索引对应 ModScreenHandlers.SETTING_*），默认值取自 ModScreenHandlers.SETTING_DEFAULTS */
+	private final boolean[] settings = ModScreenHandlers.SETTING_DEFAULTS.clone();
 
 	/** 关联的方块位置 */
 	private final BlockPos blockPos;
@@ -47,6 +51,24 @@ public class AutoHarvesterScreenHandler extends AbstractContainerMenu {
 			};
 			this.addDataSlot(slot);
 		}
+
+		// 附加开关同样各占一个 DataSlot，顺序排在作物开关之后（客户端按同样顺序创建，索引一致）
+		for (int i = 0; i < ModScreenHandlers.SETTING_COUNT; i++) {
+			final int index = i;
+			DataSlot slot = new DataSlot() {
+				@Override
+				public int get() {
+					return settings[index] ? 1 : 0;
+				}
+
+				@Override
+				public void set(int value) {
+					settings[index] = value != 0;
+					if (onDataChanged != null) onDataChanged.run();
+				}
+			};
+			this.addDataSlot(slot);
+		}
 	}
 
 	/** 设置数据变更回调（Screen 在 init 时调用） */
@@ -66,6 +88,17 @@ public class AutoHarvesterScreenHandler extends AbstractContainerMenu {
 	public void setCropEnabled(int index, boolean enabled) {
 		if (index >= 0 && index < cropEnabled.length) {
 			cropEnabled[index] = enabled;
+		}
+	}
+
+	public boolean isSettingEnabled(int index) {
+		if (index < 0 || index >= settings.length) return false;
+		return settings[index];
+	}
+
+	public void setSettingEnabled(int index, boolean enabled) {
+		if (index >= 0 && index < settings.length) {
+			settings[index] = enabled;
 		}
 	}
 

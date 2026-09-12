@@ -43,15 +43,23 @@ import net.minecraft.core.registries.BuiltInRegistries;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 自动收割机方块实体。
  * <p>
  * 核心逻辑：
  * - 每 20 tick（1 秒）扫描前方 9×9 区域（以方块朝向为前方）
- * - 检测成熟作物（CropBlock 最大年龄 / NetherWartBlock 年龄 3）
- * - 获取掉落物 → 补种为初始状态 → 存入后方箱子（或散落）
- * - 支持 7 种作物的独立开关（通过 GUI 切换）
- * - NBT 持久化：收割计数 + 各作物开关状态
+ * - 成熟判定：CropBlock 取最大年龄、NetherWartBlock 取年龄 3，
+ *   其余带 age 属性的作物按各自最大年龄判定（甜浆果丛 age ≥ 2 即可采摘）
+ * - 获取掉落物 → 补种为初始状态（火把花、瓶子草植株、西瓜、南瓜只破坏不补种；甜浆果丛采摘后重置为 age=1）
+ *   → 依次存入后方、左侧、右侧的容器（装满后自动转下一个；三个方向都没有容器或全部装满时散落在地上）
+ * - 支持 10 种作物的独立开关（通过 GUI 切换，数量由 ModScreenHandlers.CROP_IDS 决定）
+ * - 支持 2 个附加开关（通过 GUI 右上角切换）：
+ *   满箱停收（默认开）——所有能检测到的容器都装不下本次收获时暂停收割，作物保持成熟；
+ *   静音（默认关）——开启后不再播放收获提示音
+ * - NBT 持久化：收割计数 + 各作物开关状态 + 各附加开关状态
  */
 public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMenuProvider<BlockPos> {
 
@@ -69,6 +77,9 @@ public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMen
 
 	/** 各作物是否启用收割（索引对应 ModScreenHandlers.CROP_IDS） */
 	private boolean[] cropEnabled = new boolean[ModScreenHandlers.CROP_IDS.length];
+
+	/** 附加开关状态（索引对应 ModScreenHandlers.SETTING_*） */
+	private boolean[] settings = ModScreenHandlers.SETTING_DEFAULTS.clone();
 
 	{
 		// 默认全部开启
@@ -106,6 +117,18 @@ public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMen
 		this.setChanged();
 	}
 
+	public boolean isSettingEnabled(int index) {
+		if (index < 0 || index >= settings.length) return false;
+		return settings[index];
+	}
+
+	public void setSettingEnabled(int index, boolean enabled) {
+		if (index >= 0 && index < settings.length) {
+			settings[index] = enabled;
+			this.setChanged();
+		}
+	}
+
 	/** GUI 标题 */
 	@Override
 	public Component getDisplayName() {
@@ -121,6 +144,9 @@ public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMen
 		AutoHarvesterScreenHandler handler = new AutoHarvesterScreenHandler(syncId, playerInv, this.worldPosition);
 		for (int i = 0; i < cropEnabled.length; i++) {
 			handler.setCropEnabled(i, cropEnabled[i]);
+		}
+		for (int i = 0; i < settings.length; i++) {
+			handler.setSettingEnabled(i, settings[i]);
 		}
 		return handler;
 	}
@@ -155,7 +181,10 @@ public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMen
 
 		if (harvested > 0) {
 			entity.harvestCount += harvested;
-			level.playSound(null, blockPos, SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.BLOCKS, 0.5F, 1.0F);
+			// 静音开关开启时不播放提示音
+			if (!entity.isSettingEnabled(ModScreenHandlers.SETTING_MUTE_SOUND)) {
+				level.playSound(null, blockPos, SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.BLOCKS, 0.5F, 1.0F);
+			}
 			entity.setChanged();
 		}
 	}
@@ -220,7 +249,20 @@ public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMen
 		if (!(level instanceof ServerLevel serverLevel)) return false;
 
 		// 获取掉落物
-		java.util.List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, null);
+		List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, null);
+
+		// 先找出后方/左侧/右侧的容器，再决定是否收割
+		Direction facing = this.getBlockState().getValue(AutoHarvesterBlock.FACING);
+		List<Container> containers = findContainers(level, facing);
+
+		// 满箱停收：存在容器、但所有容器都装不下本次收获中的任何一件物品时，
+		// 跳过本次收割（作物保持成熟状态，等腾出空间后下次扫描再收）
+		if (isSettingEnabled(ModScreenHandlers.SETTING_STOP_WHEN_FULL)
+				&& !containers.isEmpty()
+				&& !drops.isEmpty()
+				&& !canAcceptAny(containers, drops)) {
+			return false;
+		}
 
 		// 火把花(index=5)、瓶子草植株(index=6)、西瓜(index=7)、南瓜(index=8)：只能破坏，不补种
 		boolean isBreakOnly = (cropIndex == 5 || cropIndex == 6 || cropIndex == 7 || cropIndex == 8);
@@ -240,19 +282,20 @@ public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMen
 			}
 		}
 
-		// 将掉落物存入后方容器，或散落在地上
+		// 将掉落物存入后方/左侧/右侧的容器；三个方向都没有容器或全部装满时散落在地上
 		if (!drops.isEmpty()) {
-			Direction facing = this.getBlockState().getValue(AutoHarvesterBlock.FACING);
-			BlockPos behindPos = this.worldPosition.relative(facing.getOpposite());
-			Container container = findContainer(level, behindPos);
+			for (ItemStack drop : drops) {
+				if (drop.isEmpty()) continue;
 
-			if (container != null) {
-				for (ItemStack drop : drops) {
-					if (!drop.isEmpty()) insertIntoContainer(container, drop, level, pos);
+				// 依次尝试每个容器，前一个装不下时自动转下一个
+				for (Container container : containers) {
+					insertIntoContainer(container, drop);
+					if (drop.isEmpty()) break;
 				}
-			} else {
-				for (ItemStack drop : drops) {
-					if (!drop.isEmpty()) Block.popResource(level, pos, drop);
+
+				// 所有容器都放不下，散落在地上
+				if (!drop.isEmpty()) {
+					Block.popResource(level, pos, drop);
 				}
 			}
 		}
@@ -261,29 +304,80 @@ public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMen
 	}
 
 	/**
-	 * 将物品插入容器。
-	 * 优先合并已有同类物品，其次使用空槽位，剩余散落。
+	 * 查找方块后方、左侧、右侧三个方向的容器。
+	 * <p>
+	 * 三个方向互相独立：只放一个、放两个或三个都放都会被识别，
+	 * 返回顺序即写入优先级：后方 → 左侧 → 右侧。
+	 * 左/右以方块自身朝向为基准（后方为 facing 反方向，左右为与其垂直的两个水平方向）。
 	 */
-	private void insertIntoContainer(Container container, ItemStack stack, Level level, BlockPos pos) {
-		for (int i = 0; i < container.getContainerSize(); i++) {
+	private List<Container> findContainers(Level level, Direction facing) {
+		List<Container> containers = new ArrayList<>(3);
+
+		for (Direction side : new Direction[] {
+				facing.getOpposite(), facing.getCounterClockWise(), facing.getClockWise()
+		}) {
+			Container container = findContainer(level, this.worldPosition.relative(side));
+			if (container != null) containers.add(container);
+		}
+
+		return containers;
+	}
+
+	/**
+	 * 将物品尽量塞入指定容器：先堆叠到已有的同类物品上，再占用空槽位。
+	 * 装不下的部分保留在 stack 中，由调用方交给下一个容器或散落在地上。
+	 */
+	private void insertIntoContainer(Container container, ItemStack stack) {
+		// 1. 优先合并到已有的同类物品上
+		for (int i = 0; i < container.getContainerSize() && !stack.isEmpty(); i++) {
 			ItemStack existing = container.getItem(i);
-			if (existing.isEmpty()) {
+			if (existing.isEmpty() || !ItemStack.isSameItemSameComponents(existing, stack)) continue;
+
+			int space = existing.getMaxStackSize() - existing.getCount();
+			if (space <= 0) continue;
+
+			int toInsert = Math.min(stack.getCount(), space);
+			existing.grow(toInsert);
+			stack.shrink(toInsert);
+			container.setChanged();
+		}
+
+		// 2. 再使用空槽位
+		for (int i = 0; i < container.getContainerSize() && !stack.isEmpty(); i++) {
+			if (container.getItem(i).isEmpty()) {
 				container.setItem(i, stack.copy());
+				stack.setCount(0);
 				container.setChanged();
-				return;
-			} else if (ItemStack.isSameItemSameComponents(existing, stack) && existing.getCount() < existing.getMaxStackSize()) {
-				int space = existing.getMaxStackSize() - existing.getCount();
-				int toInsert = Math.min(stack.getCount(), space);
-				existing.grow(toInsert);
-				stack.shrink(toInsert);
-				container.setChanged();
-				if (stack.isEmpty()) return;
 			}
 		}
-		// 容器已满，散落剩余物品
-		if (!stack.isEmpty()) {
-			Block.popResource(level, pos, stack);
+	}
+
+	/**
+	 * 判断这组容器是否还能装下本次收获中的任意一件物品。
+	 * <p>
+	 * 判定口径与 {@link #insertIntoContainer} 完全一致（同类物品可堆叠，或有空槽位），
+	 * 因此「返回 false」等价于「真的一个都放不进去」。
+	 */
+	private static boolean canAcceptAny(List<Container> containers, List<ItemStack> drops) {
+		for (Container container : containers) {
+			for (ItemStack drop : drops) {
+				if (!drop.isEmpty() && canAccept(container, drop)) return true;
+			}
 		}
+		return false;
+	}
+
+	/** 单个容器能否再放下该物品 */
+	private static boolean canAccept(Container container, ItemStack stack) {
+		for (int i = 0; i < container.getContainerSize(); i++) {
+			ItemStack existing = container.getItem(i);
+			if (existing.isEmpty()) return true;
+			if (ItemStack.isSameItemSameComponents(existing, stack)
+					&& existing.getCount() < existing.getMaxStackSize()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** 查找指定位置的容器，大箱子会返回完整的54格容器 */
@@ -307,6 +401,9 @@ public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMen
 		for (int i = 0; i < cropEnabled.length; i++) {
 			output.putBoolean("crop_" + i, cropEnabled[i]);
 		}
+		for (int i = 0; i < settings.length; i++) {
+			output.putBoolean("setting_" + i, settings[i]);
+		}
 		super.saveAdditional(output);
 	}
 
@@ -317,6 +414,10 @@ public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMen
 		boolean[] defaults = createDefaultEnabled();
 		for (int i = 0; i < defaults.length; i++) {
 			cropEnabled[i] = input.getBooleanOr("crop_" + i, defaults[i]);
+		}
+		boolean[] settingDefaults = ModScreenHandlers.SETTING_DEFAULTS;
+		for (int i = 0; i < settings.length; i++) {
+			settings[i] = input.getBooleanOr("setting_" + i, settingDefaults[i]);
 		}
 	}
 
