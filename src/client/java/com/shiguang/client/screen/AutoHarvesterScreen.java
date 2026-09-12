@@ -37,8 +37,9 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 	/** 最大可见行数 */
 	private static final int MAX_VISIBLE = 6;
 
-	/** 面板半宽 / 半高（面板以屏幕中心为基准） */
+	/** 面板最小半宽（面板以屏幕中心为基准）；内容更长时按 {@link #panelHalfWidth} 自动加宽 */
 	private static final int PANEL_HALF_WIDTH = 100;
+	/** 面板半高（固定） */
 	private static final int PANEL_HALF_HEIGHT = 90;
 
 	/** 附加开关按钮高度、间距、左右内边距 */
@@ -46,8 +47,21 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 	private static final int SETTING_BUTTON_GAP = 4;
 	private static final int SETTING_BUTTON_PADDING = 8;
 
+	/** 面板内容左右留白、标题与附加开关之间的间距 */
+	private static final int PANEL_MARGIN = 8;
+	private static final int HEADER_GAP = 12;
+
 	/** 列表布局坐标 */
 	private int listX, listY, listWidth;
+
+	/**
+	 * 面板半宽。
+	 * <p>
+	 * 按「标题 + 两个附加开关」的实际文字宽度动态计算：
+	 * 中文标题较短时保持 {@link #PANEL_HALF_WIDTH}（面板 200 宽），
+	 * 英文等较长的语言会自动加宽面板，避免标题与开关按钮重叠。
+	 */
+	private int panelHalfWidth = PANEL_HALF_WIDTH;
 
 	public AutoHarvesterScreen(AutoHarvesterScreenHandler handler, Inventory playerInv, Component title) {
 		super(title);
@@ -56,21 +70,35 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 
 	@Override
 	protected void init() {
-		listWidth = 180;
-		listX = (this.width - listWidth) / 2;
-		listY = (this.height - MAX_VISIBLE * ROW_HEIGHT) / 2 + 10;
-
 		// 注册数据变更回调：服务端 DataSlot 同步时刷新按钮
 		this.handler.setOnDataChanged(this::rebuildButtons);
 		rebuildButtons();
 	}
 
 	/**
-	 * 重建所有切换按钮。
-	 * 根据当前滚动偏移量、作物开关状态和附加开关状态生成对应按钮。
+	 * 重建所有切换按钮与布局。
+	 * 根据语言（文字宽度）、滚动偏移量、作物开关状态和附加开关状态重新生成。
 	 */
 	private void rebuildButtons() {
 		this.clearWidgets();
+
+		// 附加开关文字先构建出来：面板宽度要用它算
+		Component[] settingLabels = buildSettingLabels();
+		int settingButtonsWidth = SETTING_BUTTON_GAP * (settingLabels.length - 1);
+		for (Component label : settingLabels) {
+			settingButtonsWidth += this.font.width(label) + SETTING_BUTTON_PADDING;
+		}
+
+		// 标题 + 两个开关按钮都能放下所需的最小半宽，再夹在 [PANEL_HALF_WIDTH, 屏幕可用宽度] 之间
+		int needed = PANEL_MARGIN + this.font.width(this.title) + HEADER_GAP
+				+ settingButtonsWidth + PANEL_MARGIN;
+		int maxHalfWidth = Math.max(PANEL_HALF_WIDTH, (this.width - PANEL_MARGIN) / 2);
+		this.panelHalfWidth = Math.min(Math.max((needed + 1) / 2, PANEL_HALF_WIDTH), maxHalfWidth);
+
+		// 作物列表随面板宽度伸缩，保持左右各 10px 留白
+		listWidth = this.panelHalfWidth * 2 - 20;
+		listX = (this.width - listWidth) / 2;
+		listY = (this.height - MAX_VISIBLE * ROW_HEIGHT) / 2 + 10;
 
 		int visibleCount = Math.min(ModScreenHandlers.CROP_IDS.length, MAX_VISIBLE);
 
@@ -82,11 +110,10 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 			int rowY = listY + i * ROW_HEIGHT;
 
 			boolean enabled = handler.isCropEnabled(idx);
-			String toggleText = enabled ? "开" : "关";
 			ChatFormatting color = enabled ? ChatFormatting.GREEN : ChatFormatting.RED;
 
 			var btn = net.minecraft.client.gui.components.Button.builder(
-					Component.literal(toggleText).withStyle(color),
+					Component.translatable(enabled ? "options.on" : "options.off").withStyle(color),
 					button -> {
 						// 切换状态：本地更新 + 发送网络包同步服务端
 						boolean newState = !handler.isCropEnabled(idx);
@@ -99,33 +126,42 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 			this.addRenderableWidget(btn);
 		}
 
-		rebuildSettingButtons();
+		rebuildSettingButtons(settingLabels);
+	}
+
+	/** 构建两个附加开关的按钮文字：名称 + 开关状态，全部走翻译键，随语言切换 */
+	private Component[] buildSettingLabels() {
+		Component[] labels = new Component[ModScreenHandlers.SETTING_COUNT];
+
+		for (int i = 0; i < labels.length; i++) {
+			boolean on = handler.isSettingEnabled(i);
+			labels[i] = Component.translatable(
+					"gui.auto-harvester.toggle",
+					Component.translatable(ModScreenHandlers.SETTING_NAME_KEYS[i]),
+					Component.translatable(on ? "options.on" : "options.off")
+			).withStyle(on ? ChatFormatting.GREEN : ChatFormatting.RED);
+		}
+
+		return labels;
 	}
 
 	/**
-	 * 重建右上角的两个附加开关按钮（满箱停收、静音）。
+	 * 摆放右上角的两个附加开关按钮（满箱停收、静音）。
 	 * 按钮从面板右侧向左依次排列，宽度按文字实际宽度计算。
 	 */
-	private void rebuildSettingButtons() {
+	private void rebuildSettingButtons(Component[] labels) {
 		int buttonY = this.height / 2 - PANEL_HALF_HEIGHT + 6;
 
-		// 先算总宽度，以便整体右对齐
-		Component[] labels = new Component[ModScreenHandlers.SETTING_COUNT];
-		int[] widths = new int[ModScreenHandlers.SETTING_COUNT];
-		int totalWidth = SETTING_BUTTON_GAP * (ModScreenHandlers.SETTING_COUNT - 1);
-
-		for (int i = 0; i < ModScreenHandlers.SETTING_COUNT; i++) {
-			boolean on = handler.isSettingEnabled(i);
-			labels[i] = Component.literal(ModScreenHandlers.SETTING_NAMES[i] + (on ? ":开" : ":关"))
-					.withStyle(on ? ChatFormatting.GREEN : ChatFormatting.RED);
-			widths[i] = this.font.width(labels[i]) + SETTING_BUTTON_PADDING;
-			totalWidth += widths[i];
+		int totalWidth = SETTING_BUTTON_GAP * (labels.length - 1);
+		for (Component label : labels) {
+			totalWidth += this.font.width(label) + SETTING_BUTTON_PADDING;
 		}
 
-		int x = this.width / 2 + PANEL_HALF_WIDTH - SETTING_BUTTON_PADDING / 2 - totalWidth;
+		int x = this.width / 2 + this.panelHalfWidth - SETTING_BUTTON_PADDING / 2 - totalWidth;
 
-		for (int i = 0; i < ModScreenHandlers.SETTING_COUNT; i++) {
+		for (int i = 0; i < labels.length; i++) {
 			final int settingIndex = i;
+			int width = this.font.width(labels[i]) + SETTING_BUTTON_PADDING;
 
 			var btn = net.minecraft.client.gui.components.Button.builder(
 					labels[i],
@@ -135,18 +171,18 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 						rebuildButtons();
 						ClientPlayNetworking.send(new SettingTogglePayload(settingIndex, newState));
 					}
-			).bounds(x, buttonY, widths[i], SETTING_BUTTON_HEIGHT).build();
+			).bounds(x, buttonY, width, SETTING_BUTTON_HEIGHT).build();
 
 			this.addRenderableWidget(btn);
-			x += widths[i] + SETTING_BUTTON_GAP;
+			x += width + SETTING_BUTTON_GAP;
 		}
 	}
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float deltaTicks) {
-		int panelLeft = this.width / 2 - PANEL_HALF_WIDTH;
+		int panelLeft = this.width / 2 - panelHalfWidth;
 		int panelTop = this.height / 2 - PANEL_HALF_HEIGHT;
-		int panelRight = this.width / 2 + PANEL_HALF_WIDTH;
+		int panelRight = this.width / 2 + panelHalfWidth;
 		int panelBottom = this.height / 2 + PANEL_HALF_HEIGHT;
 
 		// 绘制背景面板
@@ -168,7 +204,8 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 			int rowY = listY + i * ROW_HEIGHT;
 			boolean enabled = handler.isCropEnabled(cropIndex);
 			int textColor = enabled ? 0xFF55FF55 : 0xFFFF5555;
-			String name = ModScreenHandlers.CROP_NAMES[cropIndex];
+			// 作物名复用原版方块翻译键，随游戏语言切换
+			Component name = Component.translatable(ModScreenHandlers.cropNameKey(cropIndex));
 
 			// 行背景（半透明白色）
 			guiGraphics.fill(listX, rowY, listX + listWidth, rowY + ROW_HEIGHT - 2, 0x40FFFFFF);
@@ -183,8 +220,9 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 
 		// 滚动提示
 		if (ModScreenHandlers.CROP_IDS.length > MAX_VISIBLE) {
-			String scrollText = "滚动查看更多";
-			guiGraphics.centeredText(this.font, scrollText, this.width / 2, listY + MAX_VISIBLE * ROW_HEIGHT + 4, 0x888888);
+			guiGraphics.centeredText(this.font,
+					Component.translatable("gui.auto-harvester.scroll_hint"),
+					this.width / 2, listY + MAX_VISIBLE * ROW_HEIGHT + 4, 0x888888);
 		}
 
 		super.extractRenderState(guiGraphics, mouseX, mouseY, deltaTicks);

@@ -129,10 +129,15 @@ public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMen
 		}
 	}
 
-	/** GUI 标题 */
+	/**
+	 * GUI 标题。
+	 * <p>
+	 * 使用翻译键而非固定文本：该组件经打开界面的数据包发到客户端后，
+	 * 由客户端按当前语言解析，因此切换语言后标题会跟着变。
+	 */
 	@Override
 	public Component getDisplayName() {
-		return Component.literal("自动收割机");
+		return Component.translatable("block.auto-harvester.auto_harvester");
 	}
 
 	/**

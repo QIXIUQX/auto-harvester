@@ -17,8 +17,8 @@ import net.fabricmc.fabric.api.menu.v1.ExtendedMenuType;
  * <p>
  * 职责：
  * - 注册 AutoHarvester 的 MenuType（使用 Fabric ExtendedMenuType 传递 BlockPos）
- * - 定义支持的 10 种作物 ID、显示名称和对应物品图标
- * - 定义 2 个附加开关（满箱停收、静音）的索引、名称和默认值
+ * - 定义支持的 10 种作物 ID 和对应物品图标（名称走原版翻译键，见 {@link #cropNameKey(int)}）
+ * - 定义 2 个附加开关（满箱停收、静音）的索引、翻译键和默认值
  * - 提供作物 ID → 索引的查询方法
  */
 public class ModScreenHandlers {
@@ -50,11 +50,18 @@ public class ModScreenHandlers {
 			"minecraft:sweet_berry_bush"
 	};
 
-	/** 作物显示名称（中文） */
-	public static final String[] CROP_NAMES = {
-			"小麦", "胡萝卜", "马铃薯", "甜菜根", "下界疣", "火把花", "瓶子草植株",
-			"西瓜", "南瓜", "甜浆果"
-	};
+	/**
+	 * 作物显示名称的翻译键。
+	 * <p>
+	 * 直接复用原版方块名（{@code block.minecraft.wheat} 等），
+	 * 因此会随游戏语言自动切换，无需在模组语言文件里重复维护 10 种作物的名称。
+	 *
+	 * @param index 作物索引（对应 {@link #CROP_IDS}）
+	 * @return 翻译键，例如 {@code block.minecraft.wheat}
+	 */
+	public static String cropNameKey(int index) {
+		return "block." + CROP_IDS[index];
+	}
 
 	/** 作物对应的物品（用于 GUI 图标显示） */
 	public static final net.minecraft.world.item.Item[] CROP_ITEMS = {
@@ -86,9 +93,10 @@ public class ModScreenHandlers {
 	/** 附加开关数量 */
 	public static final int SETTING_COUNT = 2;
 
-	/** 附加开关显示名称（中文，GUI 按钮用） */
-	public static final String[] SETTING_NAMES = {
-			"满箱停收", "静音"
+	/** 附加开关名称的翻译键（GUI 按钮用，随游戏语言切换） */
+	public static final String[] SETTING_NAME_KEYS = {
+			"setting.auto-harvester.stop_when_full",
+			"setting.auto-harvester.mute"
 	};
 
 	/** 附加开关默认值：满箱停收默认开启，静音默认关闭（即默认有提示音） */
