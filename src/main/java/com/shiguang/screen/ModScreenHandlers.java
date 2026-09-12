@@ -17,7 +17,7 @@ import net.fabricmc.fabric.api.menu.v1.ExtendedMenuType;
  * <p>
  * 职责：
  * - 注册 AutoHarvester 的 MenuType（使用 Fabric ExtendedMenuType 传递 BlockPos）
- * - 定义支持的 7 种作物 ID、显示名称和对应物品图标
+ * - 定义支持的 10 种作物 ID、显示名称和对应物品图标
  * - 提供作物 ID → 索引的查询方法
  */
 public class ModScreenHandlers {
@@ -43,12 +43,16 @@ public class ModScreenHandlers {
 			"minecraft:beetroots",
 			"minecraft:nether_wart",
 			"minecraft:torchflower",
-			"minecraft:pitcher_crop"
+			"minecraft:pitcher_crop",
+			"minecraft:melon",
+			"minecraft:pumpkin",
+			"minecraft:sweet_berry_bush"
 	};
 
 	/** 作物显示名称（中文） */
 	public static final String[] CROP_NAMES = {
-			"小麦", "胡萝卜", "马铃薯", "甜菜根", "下界疣", "火把花", "瓶子草植株"
+			"小麦", "胡萝卜", "马铃薯", "甜菜根", "下界疣", "火把花", "瓶子草植株",
+			"西瓜", "南瓜", "甜浆果"
 	};
 
 	/** 作物对应的物品（用于 GUI 图标显示） */
@@ -59,7 +63,10 @@ public class ModScreenHandlers {
 			Items.BEETROOT,
 			Items.NETHER_WART,
 			Items.TORCHFLOWER,
-			Items.PITCHER_POD
+			Items.PITCHER_POD,
+			Items.MELON,
+			Items.PUMPKIN,
+			Items.SWEET_BERRIES
 	};
 
 	/** 注册菜单类型 */

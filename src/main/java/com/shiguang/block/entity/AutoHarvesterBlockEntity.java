@@ -22,6 +22,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.NetherWartBlock;
+import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
@@ -199,11 +200,17 @@ public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMen
 			int age = state.getValue(NetherWartBlock.AGE);
 			if (age < 3) return false;
 		} else {
-			// 通用 age 属性检查（兜底：处理非 CropBlock 子类的作物如瓶子草植株）
+			// 通用 age 属性检查（兜底：处理非 CropBlock 子类的作物如瓶子草植株、甜浆果丛）
 			for (Property<?> prop : state.getProperties()) {
 				if (prop.getName().equals("age") && prop instanceof IntegerProperty intProp) {
-					if (state.getValue(intProp) < intProp.getPossibleValues().stream().mapToInt(v -> (int) v).max().orElse(0)) {
-						return false;
+					int age = state.getValue(intProp);
+					// 甜浆果丛：age >= 2 即可采摘（index=9）
+					if (cropIndex == 9) {
+						if (age < 2) return false;
+					} else {
+						if (age < intProp.getPossibleValues().stream().mapToInt(v -> (int) v).max().orElse(0)) {
+							return false;
+						}
 					}
 					break;
 				}
@@ -215,12 +222,15 @@ public class AutoHarvesterBlockEntity extends BlockEntity implements ExtendedMen
 		// 获取掉落物
 		java.util.List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, null);
 
-		// 火把花(index=5)和瓶子草植株(index=6)：只能破坏，不补种
-		boolean isBreakOnly = (cropIndex == 5 || cropIndex == 6);
+		// 火把花(index=5)、瓶子草植株(index=6)、西瓜(index=7)、南瓜(index=8)：只能破坏，不补种
+		boolean isBreakOnly = (cropIndex == 5 || cropIndex == 6 || cropIndex == 7 || cropIndex == 8);
 
 		if (isBreakOnly) {
 			// 破坏：直接移除方块
 			level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+		} else if (cropIndex == 9 && block instanceof SweetBerryBushBlock) {
+			// 甜浆果丛：采摘后重置为 age=1（保留植株，可继续生长）
+			level.setBlock(pos, state.setValue(SweetBerryBushBlock.AGE, 1), Block.UPDATE_ALL);
 		} else {
 			// 补种：将作物重置为初始状态
 			if (block instanceof CropBlock cropBlock) {
