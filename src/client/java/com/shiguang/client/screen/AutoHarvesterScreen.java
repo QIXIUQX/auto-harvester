@@ -221,7 +221,13 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 		return false;
 	}
 
-	/** 按 ESC 关闭时，先通知服务端关闭菜单（否则服务端会一直认为容器还开着） */
+	/**
+	 * 按 ESC 关闭界面时，先通知服务端关闭容器菜单，再关闭界面。
+	 * <p>
+	 * {@code LocalPlayer.closeContainer()} 内部会调用
+	 * {@code clientSideCloseContainer()} → {@code Gui.setScreen(null)}，
+	 * 界面已经随之关闭，因此这里不能再手动 setScreen。
+	 */
 	@Override
 	public void onClose() {
 		if (this.minecraft.player != null) {
@@ -230,11 +236,20 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 		super.onClose();
 	}
 
-	/** 界面被替换/移除时同样关闭菜单（与 AbstractContainerScreen.removed 一致） */
+	/**
+	 * 界面被移除时的菜单侧清理（对应 {@code AbstractContainerScreen.removed()}）。
+	 * <p>
+	 * <b>这里绝对不能再调用 {@code closeContainer()}</b>：
+	 * {@code Gui.setScreen()} 是在把 screen 字段置空<b>之前</b>调用 {@code removed()}，
+	 * 而 {@code closeContainer()} 又会回调 {@code Gui.setScreen(null)}，
+	 * 于是形成 removed → closeContainer → setScreen → removed 的无限递归，
+	 * 触发 {@code StackOverflowError} 使客户端崩溃（按 ESC 关闭界面时必崩）。
+	 * 关闭容器只由 {@link #onClose()} 负责。
+	 */
 	@Override
 	public void removed() {
 		if (this.minecraft.player != null) {
-			this.minecraft.player.closeContainer();
+			this.handler.removed(this.minecraft.player);
 		}
 		super.removed();
 	}
