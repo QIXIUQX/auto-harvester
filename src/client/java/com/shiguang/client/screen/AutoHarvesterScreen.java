@@ -153,8 +153,9 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 
 		for (int i = 0; i < labels.length; i++) {
 			boolean on = handler.isSettingEnabled(i);
+			// 名称与状态都用原版键：options.generic_value 就是原版的「%s: %s」格式
 			labels[i] = Component.translatable(
-					"gui.auto-harvester.toggle",
+					"options.generic_value",
 					Component.translatable(ModScreenHandlers.SETTING_NAME_KEYS[i]),
 					Component.translatable(on ? "options.on" : "options.off")
 			).withStyle(on ? ChatFormatting.GREEN : ChatFormatting.RED);

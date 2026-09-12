@@ -126,13 +126,13 @@ src/client/java/com/shiguang/client/
 | `itemGroup.auto-harvester.main` | 创造模式分类标题 |
 | `setting.auto-harvester.stop_when_full` | 「满箱停收」开关名 |
 | `setting.auto-harvester.mute` | 「静音」开关名 |
-| `gui.auto-harvester.toggle` | 开关按钮格式（`%s：%s` / `%s: %s`） |
 | `gui.auto-harvester.scroll_hint` | 列表滚动提示 |
 
-直接复用原版键，模组无需维护：
+直接复用原版键，模组无需维护，且所有语种都由原版提供：
 
-- **作物名**：`block.minecraft.wheat`、`block.minecraft.carrots` 等（由 `ModScreenHandlers.cropNameKey()` 从 `CROP_IDS` 生成），因此所有语种的作物名都由原版提供
+- **作物名**：`block.minecraft.wheat`、`block.minecraft.carrots` 等（由 `ModScreenHandlers.cropNameKey()` 从 `CROP_IDS` 生成），显示的就是原版方块名，例如中文「小麦作物」「甜浆果丛」
 - **开关状态**：`options.on` / `options.off`
+- **开关按钮格式**：`options.generic_value`（原版的「%s: %s」）
 - **GUI 标题**：服务端构建 `Component.translatable`，客户端按自己的语言解析
 
 > 界面面板宽度按「标题 + 两个开关按钮」的实际文字宽度动态计算：中文时保持 200px，英文等较长的语言会自动加宽，避免标题与按钮重叠。

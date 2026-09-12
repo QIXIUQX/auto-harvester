@@ -3,6 +3,5 @@
   "itemGroup.auto-harvester.main": "自动收割机",
   "setting.auto-harvester.stop_when_full": "满箱停收",
   "setting.auto-harvester.mute": "静音",
-  "gui.auto-harvester.toggle": "%s：%s",
   "gui.auto-harvester.scroll_hint": "滚动查看更多"
 }

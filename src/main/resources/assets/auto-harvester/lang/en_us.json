@@ -3,6 +3,5 @@
   "itemGroup.auto-harvester.main": "Auto Harvester",
   "setting.auto-harvester.stop_when_full": "Stop when full",
   "setting.auto-harvester.mute": "Mute",
-  "gui.auto-harvester.toggle": "%s: %s",
   "gui.auto-harvester.scroll_hint": "Scroll for more"
 }
