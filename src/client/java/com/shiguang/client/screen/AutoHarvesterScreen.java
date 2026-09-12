@@ -51,8 +51,20 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 	private static final int PANEL_MARGIN = 8;
 	private static final int HEADER_GAP = 12;
 
+	/** 滚动条宽度、与列表右侧的间距、滑块最小高度 */
+	private static final int SCROLLBAR_WIDTH = 4;
+	private static final int SCROLLBAR_GAP = 3;
+	private static final int SCROLLBAR_MIN_THUMB = 16;
+
 	/** 列表布局坐标 */
 	private int listX, listY, listWidth;
+
+	/** 滚动条几何（内容不超过一屏时不显示） */
+	private boolean scrollbarVisible;
+	private int scrollbarX, scrollbarY, scrollbarHeight;
+
+	/** 是否正在拖动滚动条 */
+	private boolean draggingScrollbar;
 
 	/**
 	 * 面板半宽。
@@ -99,6 +111,12 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 		listWidth = this.panelHalfWidth * 2 - 20;
 		listX = (this.width - listWidth) / 2;
 		listY = (this.height - MAX_VISIBLE * ROW_HEIGHT) / 2 + 10;
+
+		// 滚动条几何：放在列表右侧的面板留白里，只在内容超过一屏时显示
+		this.scrollbarVisible = ModScreenHandlers.CROP_IDS.length > MAX_VISIBLE;
+		this.scrollbarX = listX + listWidth + SCROLLBAR_GAP;
+		this.scrollbarY = listY;
+		this.scrollbarHeight = MAX_VISIBLE * ROW_HEIGHT - 2;
 
 		int visibleCount = Math.min(ModScreenHandlers.CROP_IDS.length, MAX_VISIBLE);
 
@@ -218,6 +236,16 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 			guiGraphics.item(itemStack, listX + listWidth - 60, rowY + 1);
 		}
 
+		// 滚动条（内容超过一屏时才显示）
+		if (scrollbarVisible) {
+			int thumbHeight = thumbHeight();
+			int thumbY = thumbY(thumbHeight);
+			// 轨道
+			guiGraphics.fill(scrollbarX, scrollbarY, scrollbarX + SCROLLBAR_WIDTH, scrollbarY + scrollbarHeight, 0x40FFFFFF);
+			// 滑块（与面板装饰条同色）
+			guiGraphics.fill(scrollbarX, thumbY, scrollbarX + SCROLLBAR_WIDTH, thumbY + thumbHeight, 0xFF4488FF);
+		}
+
 		// 滚动提示
 		if (ModScreenHandlers.CROP_IDS.length > MAX_VISIBLE) {
 			guiGraphics.centeredText(this.font,
@@ -231,14 +259,88 @@ public class AutoHarvesterScreen extends Screen implements net.minecraft.client.
 	/** 鼠标滚轮事件：上下滚动列表 */
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-		if (verticalAmount > 0 && scrollOffset > 0) {
-			scrollOffset--;
-			rebuildButtons();
-		} else if (verticalAmount < 0 && scrollOffset + MAX_VISIBLE < ModScreenHandlers.CROP_IDS.length) {
-			scrollOffset++;
-			rebuildButtons();
+		if (verticalAmount > 0) {
+			setScrollOffset(scrollOffset - 1);
+		} else if (verticalAmount < 0) {
+			setScrollOffset(scrollOffset + 1);
 		}
 		return true;
+	}
+
+	/** 点击滚动条：立即跳到对应位置并进入拖动状态 */
+	@Override
+	public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+		if (event.button() == 0 && isOverScrollbar(event.x(), event.y())) {
+			this.draggingScrollbar = true;
+			scrollToMouse(event.y());
+			return true;
+		}
+		return super.mouseClicked(event, doubleClick);
+	}
+
+	/** 拖动滚动条；只看拖动状态即可，不必再判断按键（拖动中按键值可能变化） */
+	@Override
+	public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dragX, double dragY) {
+		if (this.draggingScrollbar) {
+			scrollToMouse(event.y());
+			return true;
+		}
+		return super.mouseDragged(event, dragX, dragY);
+	}
+
+	@Override
+	public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+		if (this.draggingScrollbar) {
+			this.draggingScrollbar = false;
+			return true;
+		}
+		return super.mouseReleased(event);
+	}
+
+	/** 设置滚动偏移（自动夹在合法范围内，变化时重建列表与按钮） */
+	private void setScrollOffset(int offset) {
+		int maxScroll = Math.max(0, ModScreenHandlers.CROP_IDS.length - MAX_VISIBLE);
+		int clamped = Math.min(Math.max(offset, 0), maxScroll);
+		if (clamped != this.scrollOffset) {
+			this.scrollOffset = clamped;
+			rebuildButtons();
+		}
+	}
+
+	/**
+	 * 把滑块中心对到鼠标纵坐标上，再换算成滚动偏移。
+	 * 点击轨道时也走这里，因此点击上下任意位置都能直接跳过去。
+	 */
+	private void scrollToMouse(double mouseY) {
+		int maxScroll = Math.max(0, ModScreenHandlers.CROP_IDS.length - MAX_VISIBLE);
+		int thumbHeight = thumbHeight();
+		int travel = this.scrollbarHeight - thumbHeight;
+		if (maxScroll == 0 || travel <= 0) return;
+
+		double ratio = (mouseY - this.scrollbarY - thumbHeight / 2.0) / travel;
+		setScrollOffset((int) Math.round(ratio * maxScroll));
+	}
+
+	/** 鼠标是否落在滚动条轨道上（横向给 2px 容差，便于点中 4px 宽的条） */
+	private boolean isOverScrollbar(double mouseX, double mouseY) {
+		return scrollbarVisible
+				&& mouseX >= scrollbarX - 2 && mouseX <= scrollbarX + SCROLLBAR_WIDTH + 2
+				&& mouseY >= scrollbarY && mouseY <= scrollbarY + scrollbarHeight;
+	}
+
+	/** 滑块高度：按「可见行数 / 总行数」的比例，并保证不小于 {@link #SCROLLBAR_MIN_THUMB} */
+	private int thumbHeight() {
+		int total = ModScreenHandlers.CROP_IDS.length;
+		if (total <= 0) return scrollbarHeight;
+		return Math.max(SCROLLBAR_MIN_THUMB, scrollbarHeight * MAX_VISIBLE / total);
+	}
+
+	/** 滑块顶部纵坐标：按滚动偏移在可滚动范围中的比例 */
+	private int thumbY(int thumbHeight) {
+		int maxScroll = Math.max(0, ModScreenHandlers.CROP_IDS.length - MAX_VISIBLE);
+		int travel = scrollbarHeight - thumbHeight;
+		if (maxScroll == 0 || travel <= 0) return scrollbarY;
+		return scrollbarY + travel * scrollOffset / maxScroll;
 	}
 
 	@Override
