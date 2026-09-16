@@ -89,6 +89,8 @@ src/client/java/com/shiguang/client/
 
 构建产物位于 `build/libs/auto-harvester-0.0.3.jar`（版本号取自 `gradle.properties` 的 `version`）。
 
+发版流程与版本号命名约定（版本号带上 Minecraft 版本，例如 `0.0.3+26.3`）见 [RELEASING.md](RELEASING.md)。
+
 ## 安装
 
 1. 安装 [Fabric Loader](https://fabricmc.net/) 0.19.5+
