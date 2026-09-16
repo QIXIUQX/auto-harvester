@@ -1,6 +1,6 @@
 # Auto Harvester（自动收割机）
 
-Minecraft 26.2 Fabric 模组，添加一个自动收割机方块，可自动收割其朝向一侧 9×9 范围内的成熟农作物。
+Minecraft 26.3 Fabric 模组，添加一个自动收割机方块，可自动收割其朝向一侧 9×9 范围内的成熟农作物。
 
 ## 功能
 
@@ -29,11 +29,12 @@ SSS
 
 | 组件 | 版本 |
 |------|------|
-| Minecraft | 26.2 |
+| Minecraft | 26.3 |
 | Fabric Loader | 0.19.5 |
-| Fabric API | 0.159.0+26.2 |
+| Fabric API | 0.160.6+26.3 |
 | Java | 25 |
-| Loom | 1.17-SNAPSHOT |
+| Loom | 1.17.21 |
+| Gradle | 9.6.0 |
 
 ## 项目结构
 
@@ -86,13 +87,13 @@ src/client/java/com/shiguang/client/
 ./gradlew build
 ```
 
-构建产物位于 `build/libs/auto-harvester-0.0.2.jar`（版本号取自 `gradle.properties` 的 `version`）。
+构建产物位于 `build/libs/auto-harvester-0.0.3.jar`（版本号取自 `gradle.properties` 的 `version`）。
 
 ## 安装
 
 1. 安装 [Fabric Loader](https://fabricmc.net/) 0.19.5+
-2. 安装 [Fabric API](https://modrinth.com/mod/fabric-api) 0.159.0+
-3. 将 `auto-harvester-0.0.2.jar` 放入 `mods` 文件夹
+2. 安装 [Fabric API](https://modrinth.com/mod/fabric-api) 0.160.6+26.3
+3. 将 `auto-harvester-0.0.3.jar` 放入 `mods` 文件夹
 
 ## GUI 开关说明
 

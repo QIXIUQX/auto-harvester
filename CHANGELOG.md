@@ -1,5 +1,16 @@
 # 更新日志
 
+## 0.0.3
+
+### 适配
+
+- **升级到 Minecraft 26.3**（Wilderness Bound 版本）：`fabric.mod.json` 的依赖同步改为 `~26.3`
+- **Fabric API 升级到 0.160.6+26.3**；Fabric Loader 仍为 0.19.5（26.3 当前的最新稳定版）
+- **构建工具链按官方建议跟进**：Loom 由 `1.17-SNAPSHOT` 固定为 `1.17.21`，Gradle 由 9.5.1 升到 9.6.0
+- **适配 26.3 移除的方块 codec API**：原版在 26.3 中删除了 `BlockBehaviour#codec`、`simpleCodec` 以及各方块的 `CODEC` 字段，方块不再通过 `MapCodec` 序列化；本模组相应移除了 `AutoHarvesterBlock` 里的 `CODEC` 与 `codec()` 覆写（方块功能与存档数据不受影响）
+
+本次为版本适配更新，模组功能没有变化。
+
 ## 0.0.2
 
 ### 新增

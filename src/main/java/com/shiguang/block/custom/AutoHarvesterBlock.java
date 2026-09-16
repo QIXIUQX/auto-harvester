@@ -24,8 +24,6 @@ import net.minecraft.world.phys.BlockHitResult;
 import com.shiguang.block.ModBlockEntities;
 import com.shiguang.block.entity.AutoHarvesterBlockEntity;
 
-import com.mojang.serialization.MapCodec;
-
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -36,11 +34,11 @@ import org.jetbrains.annotations.Nullable;
  * - 右键打开作物筛选 GUI
  * - 服务端每 20 tick 执行一次收割逻辑
  * - 通过 BaseEntityBlock 绑定 BlockEntity
+ * <p>
+ * 26.3 起原版移除了方块的 codec API（{@code BlockBehaviour#codec}/{@code simpleCodec} 与各方块的
+ * {@code CODEC} 字段），方块不再通过 MapCodec 序列化，因此这里也不再声明 CODEC。
  */
 public class AutoHarvesterBlock extends BaseEntityBlock {
-
-	/** Codec 用于方块序列化（MC 26.2 要求） */
-	public static final MapCodec<AutoHarvesterBlock> CODEC = simpleCodec(AutoHarvesterBlock::new);
 
 	/** 水平朝向属性 */
 	public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
@@ -48,11 +46,6 @@ public class AutoHarvesterBlock extends BaseEntityBlock {
 	public AutoHarvesterBlock(Properties settings) {
 		super(settings);
 		this.registerDefaultState(this.getStateDefinition().any().setValue(FACING, Direction.NORTH));
-	}
-
-	@Override
-	protected MapCodec<? extends BaseEntityBlock> codec() {
-		return CODEC;
 	}
 
 	/** 定义方块状态：仅包含水平朝向 */
